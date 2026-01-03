@@ -9,14 +9,24 @@ NoHedging is a correctness‑first, language‑agnostic rule: do not hedge resul
 
 Every time you “return something safe” instead of the real, required value, you hide bugs and make failures harder to diagnose. Be precise and confident. Your data structures either contain the values you need, or those values were never needed.
 
+## Boundary validation, internal trust
+
+NoHedging is strict about where uncertainty is allowed to exist. All uncertainty stays at the boundary. Parse and validate external input (user, config, API, DB) into strict internal models with required fields and no defaults. Once data crosses that boundary, business logic must treat it as trusted and complete. If required data is missing, that is a boundary failure and must be surfaced explicitly.
+
+Backwards compatibility is handled outside of core logic. If a schema evolves, version it and migrate externally. Do not support multiple key names or legacy shapes inside business logic as a convenience.
+
 ## Guidelines
 
 - Never invent placeholder or fallback defaults just to satisfy a return type.
+- Validate at boundaries: convert raw dictionaries into strict models (dataclasses/models) with required fields and no defaults.
+- After validation, business logic must not hedge. Missing required data is a boundary error, not a runtime surprise to paper over.
 - If a default is truly required, think hard about where it belongs and define it in exactly one place in the codebase (typically at a boundary or constructor), not scattered across call sites.
 - If required data is missing, fail loudly (raise, return an explicit error, or make absence part of the type).
 - Prefer explicit types over ambiguous containers.
 - Avoid “just in case” optional fields; model reality.
+- Do not carry legacy compatibility in core logic. Use versioning and external migration tools instead.
 - Subtle bugs happen when well‑meaning hedges prevent failures; treat missing‑data crashes as valuable signals, not inconveniences to paper over.
+- This rule is strict. There are no local overrides or “pragmatic” exceptions.
 
 ## Addendum: language‑specific notes
 
@@ -24,10 +34,10 @@ Every time you “return something safe” instead of the real, required value, 
 
 If you’re in Python, use structured, validated types:
 
-- Use `@dataclass` for simple immutable/typed data containers.
+- Use `@dataclass` for simple immutable/typed data containers with required fields and no defaults.
 - Use Pydantic models when you need validation, parsing, or boundary checks.
 - Avoid default values for required fields; make callers provide them.
-- Under these rules, never do `x.get("hello", "")` (or any `dict.get(key, default)` that invents a value). Access the key directly and handle absence explicitly.
+- Under these rules, never do `x.get("hello", "")` (or any `dict.get(key, default)` that invents a value). Access the key directly and handle absence explicitly at the boundary.
 
 Examples:
 
@@ -61,7 +71,7 @@ class User:
 ### JavaScript / TypeScript
 
 - Don’t use `||` or `??` to invent “safe” defaults for required values. If absence is possible, make it explicit in the type (`T | undefined`) and handle it intentionally.
-- Validate inputs at boundaries (API, file I/O, env). If a field is required, fail fast rather than substituting `""`, `0`, `{}`, or `[]`.
+- Validate inputs at boundaries (API, file I/O, env) and construct strict internal models. If a field is required, fail fast rather than substituting `""`, `0`, `{}`, or `[]`.
 - Prefer explicit error returns (`throw`, `Result`-style objects) over silent fallbacks.
 
 ### C++
